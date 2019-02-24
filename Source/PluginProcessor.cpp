@@ -100,6 +100,8 @@ void RepeaterPluginAudioProcessor::prepareToPlay (double sampleRate, int samples
     notes.clear();
     currentlyPlayingNotes.clear();
     notesPerBar = 16;
+    skipPercentage = 25;
+    skipNext = false;
 }
 
 void RepeaterPluginAudioProcessor::releaseResources()
@@ -202,18 +204,35 @@ int RepeaterPluginAudioProcessor::getPlacementInBar(double currentPosition) {
   return std::floor(currentPosition / beatsPerNote);
 }
 
+bool RepeaterPluginAudioProcessor::getRandomBoolByPercentage(int percentage) {
+  return Random::getSystemRandom().nextInt(Range<int>(-percentage, 100 - percentage)) < 0;
+}
+
+bool RepeaterPluginAudioProcessor::shouldSkipNext() {
+  return getRandomBoolByPercentage(skipPercentage);
+}
+
+void RepeaterPluginAudioProcessor::updatePerBeat() {
+  skipNext = shouldSkipNext();
+}
+
 bool RepeaterPluginAudioProcessor::shouldTriggerNote() {
   auto playHead = getPlayHead();
   AudioPlayHead::CurrentPositionInfo currentPosition;
   playHead->getCurrentPosition(currentPosition);
   auto barPosition = currentPosition.ppqPosition;
   auto currentPlacement = getPlacementInBar(barPosition);
-  auto shouldTrigger = (barPosition < prevBarPosition || currentPlacement > getPlacementInBar(prevBarPosition));
+  auto shouldTriggerBasedOnPosition = (barPosition < prevBarPosition || currentPlacement > getPlacementInBar(prevBarPosition));
   /* if (shouldTrigger) { */
   /*   std::cout << "currentPlacement " << currentPlacement << "\n"; */
   /*   std::cout << "prevPlacement " << getPlacementInBar(prevBarPosition) << "\n"; */
   /* } */
   prevBarPosition = barPosition;
+  /* std::cout << "shouldTriggerBasedOnPosition " << shouldTriggerBasedOnPosition << "\n"; */
+  if (!shouldTriggerBasedOnPosition) return false;
+  auto shouldTrigger = true;
+  if (skipNext) shouldTrigger = false;
+  updatePerBeat();
   return shouldTrigger;
 }
 
