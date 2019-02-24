@@ -102,6 +102,9 @@ void RepeaterPluginAudioProcessor::prepareToPlay (double sampleRate, int samples
     notesPerBar = 16;
     skipPercentage = 25;
     skipNext = false;
+    multiplePercentages.insert(std::make_pair(2, 10));
+    multiplePercentages.insert(std::make_pair(3, 6));
+    multipleNext = 0;
 }
 
 void RepeaterPluginAudioProcessor::releaseResources()
@@ -204,8 +207,23 @@ int RepeaterPluginAudioProcessor::getPlacementInBar(double currentPosition) {
   return std::floor(currentPosition / beatsPerNote);
 }
 
+int RepeaterPluginAudioProcessor::getMultiplePlacementInBar(double currentPosition) {
+  if (multipleNext == 0) return -1;
+  auto beatsPerNote = 4.0f / (float) (notesPerBar * multipleNext);
+  return std::floor(currentPosition / beatsPerNote);
+}
+
 bool RepeaterPluginAudioProcessor::getRandomBoolByPercentage(int percentage) {
   return Random::getSystemRandom().nextInt(Range<int>(-percentage, 100 - percentage)) < 0;
+}
+
+int RepeaterPluginAudioProcessor::shouldMultipleNext() {
+  std::map<int, int>::iterator it = multiplePercentages.begin();
+  while (it != multiplePercentages.end()) {
+    if (getRandomBoolByPercentage(it->second)) return it->first;
+    it++;
+  }
+  return 0;
 }
 
 bool RepeaterPluginAudioProcessor::shouldSkipNext() {
@@ -214,6 +232,7 @@ bool RepeaterPluginAudioProcessor::shouldSkipNext() {
 
 void RepeaterPluginAudioProcessor::updatePerBeat() {
   skipNext = shouldSkipNext();
+  multipleNext = shouldMultipleNext();
 }
 
 bool RepeaterPluginAudioProcessor::shouldTriggerNote() {
@@ -227,9 +246,16 @@ bool RepeaterPluginAudioProcessor::shouldTriggerNote() {
   /*   std::cout << "currentPlacement " << currentPlacement << "\n"; */
   /*   std::cout << "prevPlacement " << getPlacementInBar(prevBarPosition) << "\n"; */
   /* } */
+  auto prevMultiplePlacement = getMultiplePlacementInBar(prevBarPosition);
   prevBarPosition = barPosition;
   /* std::cout << "shouldTriggerBasedOnPosition " << shouldTriggerBasedOnPosition << "\n"; */
-  if (!shouldTriggerBasedOnPosition) return false;
+  if (!shouldTriggerBasedOnPosition) {
+    if (!(multipleNext > 0)) return false;
+    auto currentMultiplePlacement = getMultiplePlacementInBar(barPosition);
+    auto shouldTriggerMultipleBasedOnPosition = currentMultiplePlacement > prevMultiplePlacement;
+    if (shouldTriggerMultipleBasedOnPosition) return true;
+    return false;
+  }
   auto shouldTrigger = true;
   if (skipNext) shouldTrigger = false;
   updatePerBeat();

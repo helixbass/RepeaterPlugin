@@ -12,6 +12,8 @@
 
 #include "../JuceLibraryCode/JuceHeader.h"
 
+#include <map>
+
 //==============================================================================
 /**
 */
@@ -63,6 +65,8 @@ private:
     bool shouldSkipNext();
     bool getRandomBoolByPercentage(int percentage);
     void updatePerBeat();
+    int shouldMultipleNext();
+    int getMultiplePlacementInBar(double barPosition);
 
     SortedSet<int> notes;
     SortedSet<int> currentlyPlayingNotes;
@@ -70,4 +74,6 @@ private:
     int notesPerBar;
     int skipPercentage;
     bool skipNext;
+    std::map<int, int> multiplePercentages;
+    int multipleNext;
 };
