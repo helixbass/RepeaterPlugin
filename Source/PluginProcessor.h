@@ -58,4 +58,11 @@ public:
 private:
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (RepeaterPluginAudioProcessor)
+    bool shouldTriggerNote();
+    int getPlacementInBar(double barPosition);
+
+    SortedSet<int> notes;
+    SortedSet<int> currentlyPlayingNotes;
+    double prevBarPosition;
+    int notesPerBar;
 };

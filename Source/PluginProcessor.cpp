@@ -97,6 +97,9 @@ void RepeaterPluginAudioProcessor::prepareToPlay (double sampleRate, int samples
 {
     // Use this method as the place to do any pre-playback
     // initialisation that you need..
+    notes.clear();
+    currentlyPlayingNotes.clear();
+    notesPerBar = 16;
 }
 
 void RepeaterPluginAudioProcessor::releaseResources()
@@ -156,6 +159,62 @@ void RepeaterPluginAudioProcessor::processBlock (AudioBuffer<float>& buffer, Mid
 
         // ..do something to the data...
     }
+
+    MidiMessage msg;
+    int ignore;
+
+    for (MidiBuffer::Iterator it(midiMessages); it.getNextEvent(msg, ignore); ) {
+      if      (msg.isNoteOn())  {
+        notes.add(msg.getNoteNumber());
+        /* std::cout << "adding note " << msg.getNoteNumber() << "\n"; */
+      }
+      else if (msg.isNoteOff()) {
+        notes.removeValue(msg.getNoteNumber());
+        /* std::cout << "removing note " << msg.getNoteNumber() << "\n"; */
+      }
+    }
+
+    midiMessages.clear();
+
+    if (shouldTriggerNote()) {
+      /* std::cout << "triggering " << "\n"; */
+      if (currentlyPlayingNotes.size() > 0) {
+        for (auto index = 0; index < currentlyPlayingNotes.size(); index++) {
+          auto currentlyPlayingNote = currentlyPlayingNotes[index];
+          midiMessages.addEvent(MidiMessage::noteOff(1, currentlyPlayingNote), 0);
+        }
+        currentlyPlayingNotes.clear();
+      }
+
+      if (notes.size() > 0) {
+        for (auto index = 0; index < notes.size(); index++) {
+          auto note = notes[index];
+          /* std::cout << "playing note " << note << "\n"; */
+          midiMessages.addEvent(MidiMessage::noteOn(1, note, (uint8) 85), 0);
+          currentlyPlayingNotes.add(note);
+        }
+      }
+    }
+}
+
+int RepeaterPluginAudioProcessor::getPlacementInBar(double currentPosition) {
+  auto beatsPerNote = 4.0f / (float) notesPerBar;
+  return std::floor(currentPosition / beatsPerNote);
+}
+
+bool RepeaterPluginAudioProcessor::shouldTriggerNote() {
+  auto playHead = getPlayHead();
+  AudioPlayHead::CurrentPositionInfo currentPosition;
+  playHead->getCurrentPosition(currentPosition);
+  auto barPosition = currentPosition.ppqPosition;
+  auto currentPlacement = getPlacementInBar(barPosition);
+  auto shouldTrigger = (barPosition < prevBarPosition || currentPlacement > getPlacementInBar(prevBarPosition));
+  /* if (shouldTrigger) { */
+  /*   std::cout << "currentPlacement " << currentPlacement << "\n"; */
+  /*   std::cout << "prevPlacement " << getPlacementInBar(prevBarPosition) << "\n"; */
+  /* } */
+  prevBarPosition = barPosition;
+  return shouldTrigger;
 }
 
 //==============================================================================
